@@ -6,7 +6,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report, precision_recall_fscore_support
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.utils import to_categorical
 
 # Load dataset
@@ -33,13 +35,23 @@ X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_st
 
 # Model Definition
 model = Sequential()
-model.add(LSTM(50, activation='relu', input_shape=(1, 1)))
+model.add(LSTM(50, activation='relu', input_shape=(1, 1), return_sequences=True))
+model.add(Dropout(0.2))
+model.add(LSTM(50, activation='relu'))
+model.add(Dropout(0.2))
 model.add(Dense(4, activation='softmax'))  # Assuming 4 classes
 
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+# Compile model with a smaller learning rate and add callbacks
+optimizer = Adam(learning_rate=0.001)
+model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+
+# Callbacks for early stopping and reducing learning rate
+early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=0.0001)
 
 # Model Training
-history = model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(X_val, y_val))
+history = model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(X_val, y_val),
+                    callbacks=[early_stopping, reduce_lr])
 
 # Model Evaluation
 y_pred = model.predict(X_val)
